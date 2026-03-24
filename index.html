@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>10초 달리기 챌린지</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    font-family: 'Segoe UI', sans-serif;
+    background: #000;
+  }
+  canvas { display: block; }
+
+  #ui-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  #hud {
+    display: none;
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 20px;
+    text-align: center;
+  }
+
+  #timer {
+    font-size: 48px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 20px rgba(255, 100, 50, 0.8);
+  }
+
+  #tap-count {
+    font-size: 80px;
+    font-weight: 900;
+    color: #FFD700;
+    text-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+    margin-top: 10px;
+    transition: transform 0.05s;
+  }
+
+  #tap-label {
+    font-size: 18px;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+
+  #start-screen, #result-screen {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    background: rgba(0,0,0,0.6);
+  }
+
+  #result-screen { display: none; }
+
+  .screen-title {
+    font-size: 36px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 10px;
+    text-shadow: 0 0 20px rgba(0,150,255,0.5);
+  }
+
+  .screen-subtitle {
+    font-size: 16px;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 40px;
+  }
+
+  .btn {
+    padding: 18px 50px;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    background: linear-gradient(135deg, #FF6B35, #F7C948);
+    box-shadow: 0 8px 30px rgba(255, 107, 53, 0.4);
+    transition: transform 0.1s;
+    pointer-events: auto;
+  }
+
+  .btn:active { transform: scale(0.95); }
+
+  #result-taps {
+    font-size: 100px;
+    font-weight: 900;
+    color: #FFD700;
+    text-shadow: 0 0 40px rgba(255, 215, 0, 0.6);
+  }
+
+  #result-label {
+    font-size: 20px;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 10px;
+  }
+
+  #result-grade {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 30px;
+  }
+
+  #countdown-overlay {
+    display: none;
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  #countdown-text {
+    font-size: 120px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 40px rgba(255,255,255,0.5);
+    animation: pulse 0.5s ease-in-out;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(2); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes tapBounce {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+
+  .tap-bounce { animation: tapBounce 0.1s ease-out; }
+
+  #progress-bar-container {
+    width: 80%;
+    max-width: 400px;
+    height: 8px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 4px;
+    margin-top: 15px;
+    overflow: hidden;
+  }
+
+  #progress-bar {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #FF6B35, #F7C948);
+    border-radius: 4px;
+    transition: width 0.1s linear;
+  }
+
+  .tap-effect {
+    position: fixed;
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    border: 3px solid #FFD700;
+    pointer-events: none;
+    animation: ripple 0.4s ease-out forwards;
+    z-index: 20;
+  }
+
+  @keyframes ripple {
+    0% { transform: scale(0.5); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div id="ui-overlay">
+  <!-- HUD -->
+  <div id="hud">
+    <div id="timer">10.00</div>
+    <div id="tap-count">0</div>
+    <div id="tap-label">TAPS</div>
+    <div id="progress-bar-container">
+      <div id="progress-bar"></div>
+    </div>
+  </div>
+
+  <!-- Start Screen -->
+  <div id="start-screen">
+    <div class="screen-title">10초 달리기 챌린지</div>
+    <div class="screen-subtitle">10초 동안 최대한 많이 터치하세요!</div>
+    <button class="btn" id="start-btn">START</button>
+  </div>
+
+  <!-- Countdown -->
+  <div id="countdown-overlay">
+    <div id="countdown-text"></div>
+  </div>
+
+  <!-- Result Screen -->
+  <div id="result-screen">
+    <div class="screen-title">결과</div>
+    <div id="result-label">총 터치 횟수</div>
+    <div id="result-taps">0</div>
+    <div id="result-grade"></div>
+    <button class="btn" id="retry-btn">다시 하기</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ── Scene Setup ──
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0x87CEEB, 30, 80);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 4, 8);
+camera.lookAt(0, 1.5, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ── Lights ──
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(5, 10, 5);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(1024, 1024);
+scene.add(dirLight);
+
+// ── Ground / Track ──
+const trackGeo = new THREE.PlaneGeometry(6, 200);
+const trackMat = new THREE.MeshStandardMaterial({ color: 0xE07848, roughness: 0.9 });
+const track = new THREE.Mesh(trackGeo, trackMat);
+track.rotation.x = -Math.PI / 2;
+track.position.z = -80;
+track.receiveShadow = true;
+scene.add(track);
+
+// Track lines
+for (let i = -1; i <= 1; i += 2) {
+  const lineGeo = new THREE.PlaneGeometry(0.1, 200);
+  const lineMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  const line = new THREE.Mesh(lineGeo, lineMat);
+  line.rotation.x = -Math.PI / 2;
+  line.position.set(i * 2.5, 0.01, -80);
+  scene.add(line);
+}
+
+// Grass
+for (let side = -1; side <= 1; side += 2) {
+  const grassGeo = new THREE.PlaneGeometry(40, 200);
+  const grassMat = new THREE.MeshStandardMaterial({ color: 0x4CAF50, roughness: 1 });
+  const grass = new THREE.Mesh(grassGeo, grassMat);
+  grass.rotation.x = -Math.PI / 2;
+  grass.position.set(side * 23, -0.01, -80);
+  grass.receiveShadow = true;
+  scene.add(grass);
+}
+
+// ── Character (simple block person) ──
+const character = new THREE.Group();
+
+// Body
+const bodyGeo = new THREE.BoxGeometry(0.8, 1.0, 0.5);
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2196F3 });
+const body = new THREE.Mesh(bodyGeo, bodyMat);
+body.position.y = 1.8;
+body.castShadow = true;
+character.add(body);
+
+// Head
+const headGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+const headMat = new THREE.MeshStandardMaterial({ color: 0xFFCC80 });
+const head = new THREE.Mesh(headGeo, headMat);
+head.position.y = 2.6;
+head.castShadow = true;
+character.add(head);
+
+// Eyes
+for (let side = -1; side <= 1; side += 2) {
+  const eyeGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+  const eye = new THREE.Mesh(eyeGeo, eyeMat);
+  eye.position.set(side * 0.15, 2.65, 0.3);
+  character.add(eye);
+}
+
+// Legs
+const legs = [];
+for (let side = -1; side <= 1; side += 2) {
+  const legGeo = new THREE.BoxGeometry(0.3, 0.8, 0.4);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x1565C0 });
+  const leg = new THREE.Mesh(legGeo, legMat);
+  leg.position.set(side * 0.25, 0.9, 0);
+  leg.castShadow = true;
+  character.add(leg);
+  legs.push(leg);
+}
+
+// Arms
+const arms = [];
+for (let side = -1; side <= 1; side += 2) {
+  const armGeo = new THREE.BoxGeometry(0.25, 0.7, 0.3);
+  const armMat = new THREE.MeshStandardMaterial({ color: 0x1E88E5 });
+  const arm = new THREE.Mesh(armGeo, armMat);
+  arm.position.set(side * 0.55, 1.8, 0);
+  arm.castShadow = true;
+  character.add(arm);
+  arms.push(arm);
+}
+
+scene.add(character);
+
+// ── Decorations (trees alongside track) ──
+function createTree(x, z) {
+  const group = new THREE.Group();
+  const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 1.5, 6);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8D6E63 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = 0.75;
+  trunk.castShadow = true;
+  group.add(trunk);
+
+  const leavesGeo = new THREE.SphereGeometry(0.8, 6, 6);
+  const leavesMat = new THREE.MeshStandardMaterial({ color: 0x388E3C });
+  const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+  leaves.position.y = 2;
+  leaves.castShadow = true;
+  group.add(leaves);
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+const trees = [];
+for (let i = 0; i < 30; i++) {
+  const side = Math.random() > 0.5 ? 1 : -1;
+  const x = side * (4 + Math.random() * 3);
+  const z = -i * 6 + Math.random() * 3;
+  trees.push(createTree(x, z));
+}
+
+// ── Distance markers ──
+function createMarker(z, text) {
+  const geo = new THREE.PlaneGeometry(2, 0.5);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 256, 64);
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 36px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 128, 44);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(0, 3.5, z);
+  scene.add(mesh);
+  return mesh;
+}
+
+const markers = [];
+for (let i = 1; i <= 10; i++) {
+  markers.push(createMarker(-i * 10, `${i * 10}m`));
+}
+
+// ── Game State ──
+let gameState = 'idle'; // idle, countdown, playing, ended
+let tapCount = 0;
+let timeLeft = 10;
+let startTime = 0;
+let runSpeed = 0;
+let runDistance = 0;
+let animTime = 0;
+
+// ── UI Elements ──
+const hud = document.getElementById('hud');
+const timerEl = document.getElementById('timer');
+const tapCountEl = document.getElementById('tap-count');
+const startScreen = document.getElementById('start-screen');
+const resultScreen = document.getElementById('result-screen');
+const countdownOverlay = document.getElementById('countdown-overlay');
+const countdownText = document.getElementById('countdown-text');
+const progressBar = document.getElementById('progress-bar');
+const resultTaps = document.getElementById('result-taps');
+const resultGrade = document.getElementById('result-grade');
+
+// ── Start Game ──
+document.getElementById('start-btn').addEventListener('click', startCountdown);
+document.getElementById('retry-btn').addEventListener('click', () => {
+  resultScreen.style.display = 'none';
+  startCountdown();
+});
+
+function startCountdown() {
+  startScreen.style.display = 'none';
+  resultScreen.style.display = 'none';
+  gameState = 'countdown';
+  tapCount = 0;
+  timeLeft = 10;
+  runSpeed = 0;
+  runDistance = 0;
+  tapCountEl.textContent = '0';
+
+  countdownOverlay.style.display = 'flex';
+  let count = 3;
+  countdownText.textContent = count;
+  countdownText.style.animation = 'none';
+  void countdownText.offsetWidth;
+  countdownText.style.animation = 'pulse 0.5s ease-in-out';
+
+  const interval = setInterval(() => {
+    count--;
+    if (count > 0) {
+      countdownText.textContent = count;
+      countdownText.style.animation = 'none';
+      void countdownText.offsetWidth;
+      countdownText.style.animation = 'pulse 0.5s ease-in-out';
+    } else if (count === 0) {
+      countdownText.textContent = 'GO!';
+      countdownText.style.color = '#FFD700';
+      countdownText.style.animation = 'none';
+      void countdownText.offsetWidth;
+      countdownText.style.animation = 'pulse 0.5s ease-in-out';
+    } else {
+      clearInterval(interval);
+      countdownOverlay.style.display = 'none';
+      countdownText.style.color = '#fff';
+      startGame();
+    }
+  }, 800);
+}
+
+function startGame() {
+  gameState = 'playing';
+  startTime = performance.now();
+  hud.style.display = 'block';
+}
+
+function endGame() {
+  gameState = 'ended';
+  hud.style.display = 'none';
+
+  resultTaps.textContent = tapCount;
+
+  let grade = '';
+  if (tapCount >= 80) { grade = '🏆 초인 레벨!'; resultGrade.style.color = '#FFD700'; }
+  else if (tapCount >= 60) { grade = '🔥 프로 게이머!'; resultGrade.style.color = '#FF6B35'; }
+  else if (tapCount >= 40) { grade = '👍 꽤 빠르네요!'; resultGrade.style.color = '#4CAF50'; }
+  else if (tapCount >= 20) { grade = '😊 괜찮아요!'; resultGrade.style.color = '#2196F3'; }
+  else { grade = '💪 더 연습해보세요!'; resultGrade.style.color = '#9E9E9E'; }
+
+  resultGrade.textContent = grade;
+  resultScreen.style.display = 'flex';
+}
+
+// ── Tap Handler ──
+function handleTap(e) {
+  if (gameState !== 'playing') return;
+
+  tapCount++;
+  tapCountEl.textContent = tapCount;
+  tapCountEl.classList.remove('tap-bounce');
+  void tapCountEl.offsetWidth;
+  tapCountEl.classList.add('tap-bounce');
+
+  // Speed boost
+  runSpeed = Math.min(runSpeed + 0.3, 8);
+
+  // Ripple effect
+  const x = e.clientX || (e.touches && e.touches[0]?.clientX) || window.innerWidth / 2;
+  const y = e.clientY || (e.touches && e.touches[0]?.clientY) || window.innerHeight / 2;
+  const ripple = document.createElement('div');
+  ripple.className = 'tap-effect';
+  ripple.style.left = (x - 30) + 'px';
+  ripple.style.top = (y - 30) + 'px';
+  document.body.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 400);
+}
+
+// Prevent double events on mobile
+window.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  handleTap(e);
+}, { passive: false });
+
+window.addEventListener('mousedown', (e) => {
+  handleTap(e);
+});
+
+// ── Clouds ──
+const clouds = [];
+for (let i = 0; i < 8; i++) {
+  const cloudGeo = new THREE.SphereGeometry(1 + Math.random(), 6, 6);
+  const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+  const cloud = new THREE.Mesh(cloudGeo, cloudMat);
+  cloud.position.set(
+    (Math.random() - 0.5) * 30,
+    10 + Math.random() * 5,
+    -Math.random() * 60
+  );
+  cloud.scale.set(2, 0.6, 1);
+  scene.add(cloud);
+  clouds.push(cloud);
+}
+
+// ── Animation Loop ──
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  animTime += delta;
+
+  if (gameState === 'playing') {
+    // Timer
+    const elapsed = (performance.now() - startTime) / 1000;
+    timeLeft = Math.max(0, 10 - elapsed);
+    timerEl.textContent = timeLeft.toFixed(2);
+    progressBar.style.width = (timeLeft / 10 * 100) + '%';
+
+    // Timer color
+    if (timeLeft <= 3) {
+      timerEl.style.color = '#FF4444';
+    } else {
+      timerEl.style.color = '#fff';
+    }
+
+    if (timeLeft <= 0) {
+      endGame();
+    }
+
+    // Run speed decay
+    runSpeed *= 0.98;
+    runDistance += runSpeed * delta;
+
+    // Animate legs
+    const legSwing = Math.sin(animTime * 12) * 0.5 * Math.min(runSpeed / 3, 1);
+    legs[0].position.z = legSwing * 0.3;
+    legs[1].position.z = -legSwing * 0.3;
+    legs[0].rotation.x = legSwing;
+    legs[1].rotation.x = -legSwing;
+
+    // Animate arms
+    arms[0].rotation.x = -legSwing * 0.8;
+    arms[1].rotation.x = legSwing * 0.8;
+
+    // Body bob
+    body.position.y = 1.8 + Math.abs(Math.sin(animTime * 12)) * 0.05 * Math.min(runSpeed / 3, 1);
+    head.position.y = 2.6 + Math.abs(Math.sin(animTime * 12)) * 0.05 * Math.min(runSpeed / 3, 1);
+
+    // Camera follows distance
+    character.position.z = -runDistance * 0.5;
+    camera.position.z = character.position.z + 8;
+    camera.lookAt(character.position.x, 1.5, character.position.z);
+
+    // Move trees that went behind camera back to front
+    trees.forEach(tree => {
+      if (tree.position.z > camera.position.z + 5) {
+        tree.position.z -= 180;
+      }
+    });
+
+    // Move clouds
+    clouds.forEach(cloud => {
+      if (cloud.position.z > camera.position.z + 10) {
+        cloud.position.z -= 80;
+      }
+    });
+
+  } else if (gameState === 'idle' || gameState === 'countdown') {
+    // Idle animation - gentle bobbing
+    character.position.y = Math.sin(animTime * 2) * 0.05;
+    legs[0].rotation.x = 0;
+    legs[1].rotation.x = 0;
+    arms[0].rotation.x = 0;
+    arms[1].rotation.x = 0;
+  } else if (gameState === 'ended') {
+    // Slow down
+    runSpeed *= 0.95;
+    runDistance += runSpeed * delta;
+    character.position.z = -runDistance * 0.5;
+    camera.position.z = character.position.z + 8;
+    camera.lookAt(character.position.x, 1.5, character.position.z);
+  }
+
+  // Direction light follows
+  dirLight.position.x = character.position.x + 5;
+  dirLight.position.z = character.position.z + 5;
+  dirLight.target.position.copy(character.position);
+  dirLight.target.updateMatrixWorld();
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// ── Resize ──
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
