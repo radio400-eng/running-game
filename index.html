@@ -69,6 +69,76 @@
 
   #result-screen { display: none; }
 
+  #name-screen {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    background: rgba(0,0,0,0.6);
+  }
+
+  #name-input {
+    padding: 14px 24px;
+    font-size: 22px;
+    font-weight: 700;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    text-align: center;
+    outline: none;
+    margin-bottom: 20px;
+    width: 250px;
+  }
+
+  #name-input::placeholder {
+    color: rgba(255,255,255,0.4);
+  }
+
+  #name-input:focus {
+    border-color: #FFD700;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+  }
+
+  #leaderboard {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 12px;
+    padding: 12px 16px;
+    min-width: 180px;
+    pointer-events: none;
+    backdrop-filter: blur(5px);
+  }
+
+  #leaderboard h3 {
+    font-size: 14px;
+    color: #FFD700;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .lb-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 14px;
+    color: rgba(255,255,255,0.85);
+  }
+
+  .lb-rank { font-weight: 900; margin-right: 8px; }
+  .lb-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-score { font-weight: 700; color: #FFD700; margin-left: 10px; }
+
+  .lb-empty { color: rgba(255,255,255,0.3); font-size: 13px; padding: 4px 0; }
+
   .screen-title {
     font-size: 36px;
     font-weight: 900;
@@ -198,11 +268,25 @@
     </div>
   </div>
 
-  <!-- Start Screen -->
-  <div id="start-screen">
+  <!-- Leaderboard -->
+  <div id="leaderboard">
+    <h3>🏅 RANKING</h3>
+    <div id="lb-list"></div>
+  </div>
+
+  <!-- Name Screen -->
+  <div id="name-screen">
     <div class="screen-title">10초 달리기 챌린지</div>
     <div class="screen-subtitle">10초 동안 최대한 많이 터치하세요!</div>
+    <input type="text" id="name-input" placeholder="이름을 입력하세요" maxlength="10">
     <button class="btn" id="start-btn">START</button>
+  </div>
+
+  <!-- Start Screen (retry) -->
+  <div id="start-screen" style="display:none">
+    <div class="screen-title">10초 달리기 챌린지</div>
+    <div class="screen-subtitle">10초 동안 최대한 많이 터치하세요!</div>
+    <button class="btn" id="start-btn2">START</button>
   </div>
 
   <!-- Countdown -->
@@ -404,11 +488,13 @@ let startTime = 0;
 let runSpeed = 0;
 let runDistance = 0;
 let animTime = 0;
+let playerName = '';
 
 // ── UI Elements ──
 const hud = document.getElementById('hud');
 const timerEl = document.getElementById('timer');
 const tapCountEl = document.getElementById('tap-count');
+const nameScreen = document.getElementById('name-screen');
 const startScreen = document.getElementById('start-screen');
 const resultScreen = document.getElementById('result-screen');
 const countdownOverlay = document.getElementById('countdown-overlay');
@@ -416,9 +502,53 @@ const countdownText = document.getElementById('countdown-text');
 const progressBar = document.getElementById('progress-bar');
 const resultTaps = document.getElementById('result-taps');
 const resultGrade = document.getElementById('result-grade');
+const nameInput = document.getElementById('name-input');
+const lbList = document.getElementById('lb-list');
+
+// ── Leaderboard ──
+function getLeaderboard() {
+  try {
+    return JSON.parse(localStorage.getItem('runningLeaderboard') || '[]');
+  } catch { return []; }
+}
+
+function saveScore(name, score) {
+  const lb = getLeaderboard();
+  lb.push({ name, score, date: Date.now() });
+  lb.sort((a, b) => b.score - a.score);
+  localStorage.setItem('runningLeaderboard', JSON.stringify(lb.slice(0, 10)));
+}
+
+function renderLeaderboard() {
+  const lb = getLeaderboard();
+  const medals = ['🥇', '🥈', '🥉'];
+  if (lb.length === 0) {
+    lbList.innerHTML = '<div class="lb-empty">기록 없음</div>';
+    return;
+  }
+  lbList.innerHTML = lb.slice(0, 3).map((entry, i) =>
+    `<div class="lb-entry">
+      <span class="lb-rank">${medals[i]}</span>
+      <span class="lb-name">${entry.name}</span>
+      <span class="lb-score">${entry.score}회</span>
+    </div>`
+  ).join('');
+}
+
+renderLeaderboard();
 
 // ── Start Game ──
-document.getElementById('start-btn').addEventListener('click', startCountdown);
+document.getElementById('start-btn').addEventListener('click', () => {
+  playerName = nameInput.value.trim() || '이름없음';
+  nameScreen.style.display = 'none';
+  startCountdown();
+});
+
+document.getElementById('start-btn2').addEventListener('click', () => {
+  startScreen.style.display = 'none';
+  startCountdown();
+});
+
 document.getElementById('retry-btn').addEventListener('click', () => {
   resultScreen.style.display = 'none';
   startCountdown();
@@ -484,6 +614,9 @@ function endGame() {
 
   resultGrade.textContent = grade;
   resultScreen.style.display = 'flex';
+
+  saveScore(playerName, tapCount);
+  renderLeaderboard();
 }
 
 // ── Tap Handler ──
@@ -512,8 +645,8 @@ function handleTap(e) {
 
 // Prevent double events on mobile
 window.addEventListener('touchstart', (e) => {
-  // 버튼 터치는 기본 동작 허용
-  if (e.target.closest('.btn')) return;
+  // 버튼/입력 터치는 기본 동작 허용
+  if (e.target.closest('.btn') || e.target.closest('#name-input')) return;
   e.preventDefault();
   handleTap(e);
 }, { passive: false });
