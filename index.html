@@ -387,108 +387,88 @@ for (let side = -1; side <= 1; side += 2) {
   scene.add(grass);
 }
 
-// ── Character (cute bear) ──
+// ── Character (bear image sprite) ──
 const character = new THREE.Group();
-const bearColor = 0x8B5E3C;
-const bearLightColor = 0xC49A6C;
-const bearDarkColor = 0x6B4226;
+const bearTexture = new THREE.TextureLoader().load('곰돌이 뒷모습.png');
+bearTexture.colorSpace = THREE.SRGBColorSpace;
 
-// Body
-const bodyGeo = new THREE.SphereGeometry(0.55, 12, 12);
-const bodyMat = new THREE.MeshStandardMaterial({ color: bearColor });
-const body = new THREE.Mesh(bodyGeo, bodyMat);
-body.position.y = 1.5;
-body.scale.set(1, 1.2, 0.9);
-body.castShadow = true;
-character.add(body);
+const bearGeo = new THREE.PlaneGeometry(3, 2.4);
+const bearMat = new THREE.MeshBasicMaterial({ map: bearTexture, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide });
+const bearSprite = new THREE.Mesh(bearGeo, bearMat);
+bearSprite.position.y = 1.8;
+character.add(bearSprite);
 
-// Belly (lighter patch)
-const bellyGeo = new THREE.SphereGeometry(0.35, 12, 12);
-const bellyMat = new THREE.MeshStandardMaterial({ color: bearLightColor });
-const belly = new THREE.Mesh(bellyGeo, bellyMat);
-belly.position.set(0, 1.45, 0.25);
-belly.scale.set(1, 1.1, 0.5);
-character.add(belly);
-
-// Head
-const headGeo = new THREE.SphereGeometry(0.5, 12, 12);
-const headMat = new THREE.MeshStandardMaterial({ color: bearColor });
-const head = new THREE.Mesh(headGeo, headMat);
-head.position.y = 2.45;
-head.castShadow = true;
-character.add(head);
-
-// Ears
-for (let side = -1; side <= 1; side += 2) {
-  const earGeo = new THREE.SphereGeometry(0.2, 8, 8);
-  const earMat = new THREE.MeshStandardMaterial({ color: bearColor });
-  const ear = new THREE.Mesh(earGeo, earMat);
-  ear.position.set(side * 0.38, 2.85, 0);
-  character.add(ear);
-  // Inner ear
-  const innerEarGeo = new THREE.SphereGeometry(0.12, 8, 8);
-  const innerEarMat = new THREE.MeshStandardMaterial({ color: 0xFFB6C1 });
-  const innerEar = new THREE.Mesh(innerEarGeo, innerEarMat);
-  innerEar.position.set(side * 0.38, 2.85, 0.08);
-  character.add(innerEar);
-}
-
-// Eyes
-for (let side = -1; side <= 1; side += 2) {
-  // Eye white
-  const eyeWhiteGeo = new THREE.SphereGeometry(0.1, 8, 8);
-  const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-  const eyeWhite = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
-  eyeWhite.position.set(side * 0.18, 2.52, 0.4);
-  character.add(eyeWhite);
-  // Pupil
-  const pupilGeo = new THREE.SphereGeometry(0.06, 8, 8);
-  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-  const pupil = new THREE.Mesh(pupilGeo, pupilMat);
-  pupil.position.set(side * 0.18, 2.52, 0.47);
-  character.add(pupil);
-}
-
-// Nose
-const noseGeo = new THREE.SphereGeometry(0.08, 8, 8);
-const noseMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
-const nose = new THREE.Mesh(noseGeo, noseMat);
-nose.position.set(0, 2.4, 0.48);
-character.add(nose);
-
-// Mouth (small smile)
-const mouthGeo = new THREE.TorusGeometry(0.06, 0.015, 8, 12, Math.PI);
-const mouthMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
-const mouth = new THREE.Mesh(mouthGeo, mouthMat);
-mouth.position.set(0, 2.32, 0.45);
-mouth.rotation.x = -0.2;
-character.add(mouth);
-
-// Legs
-const legs = [];
-for (let side = -1; side <= 1; side += 2) {
-  const legGeo = new THREE.CylinderGeometry(0.18, 0.2, 0.6, 8);
-  const legMat = new THREE.MeshStandardMaterial({ color: bearDarkColor });
-  const leg = new THREE.Mesh(legGeo, legMat);
-  leg.position.set(side * 0.25, 0.7, 0);
-  leg.castShadow = true;
-  character.add(leg);
-  legs.push(leg);
-}
-
-// Arms
-const arms = [];
-for (let side = -1; side <= 1; side += 2) {
-  const armGeo = new THREE.CylinderGeometry(0.13, 0.15, 0.55, 8);
-  const armMat = new THREE.MeshStandardMaterial({ color: bearColor });
-  const arm = new THREE.Mesh(armGeo, armMat);
-  arm.position.set(side * 0.55, 1.6, 0);
-  arm.castShadow = true;
-  character.add(arm);
-  arms.push(arm);
-}
+// Dummy refs for leg/arm animation (bounce & sway)
+const legs = [bearSprite, bearSprite];
+const arms = [bearSprite, bearSprite];
+const body = bearSprite;
+const head = bearSprite;
 
 scene.add(character);
+
+// ── Speed tracking for dynamic animation ──
+let tapsPerSecond = 0;
+let recentTaps = [];
+
+// ── Pizza Shop (goal for 100+ taps) ──
+function createPizzaShop(z) {
+  const shop = new THREE.Group();
+
+  // Building
+  const wallGeo = new THREE.BoxGeometry(5, 4, 3);
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xFFF8DC });
+  const wall = new THREE.Mesh(wallGeo, wallMat);
+  wall.position.y = 2;
+  wall.castShadow = true;
+  shop.add(wall);
+
+  // Roof
+  const roofGeo = new THREE.BoxGeometry(5.8, 0.4, 3.6);
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0xCC3333 });
+  const roof = new THREE.Mesh(roofGeo, roofMat);
+  roof.position.y = 4.2;
+  shop.add(roof);
+
+  // Door
+  const doorGeo = new THREE.BoxGeometry(1.2, 2.2, 0.1);
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+  const door = new THREE.Mesh(doorGeo, doorMat);
+  door.position.set(0, 1.1, 1.55);
+  shop.add(door);
+
+  // Sign "PIZZA"
+  const signCanvas = document.createElement('canvas');
+  signCanvas.width = 512; signCanvas.height = 128;
+  const sCtx = signCanvas.getContext('2d');
+  sCtx.fillStyle = '#CC3333';
+  sCtx.fillRect(0, 0, 512, 128);
+  sCtx.fillStyle = '#FFD700';
+  sCtx.font = 'bold 72px sans-serif';
+  sCtx.textAlign = 'center';
+  sCtx.fillText('🍕 PIZZA 🍕', 256, 88);
+  const signTex = new THREE.CanvasTexture(signCanvas);
+  const signGeo = new THREE.PlaneGeometry(4, 1);
+  const signMat = new THREE.MeshBasicMaterial({ map: signTex });
+  const sign = new THREE.Mesh(signGeo, signMat);
+  sign.position.set(0, 5, 1.55);
+  shop.add(sign);
+
+  // Window lights
+  for (let side = -1; side <= 1; side += 2) {
+    const winGeo = new THREE.PlaneGeometry(0.8, 0.8);
+    const winMat = new THREE.MeshStandardMaterial({ color: 0xFFFF99, emissive: 0xFFFF44, emissiveIntensity: 0.5 });
+    const win = new THREE.Mesh(winGeo, winMat);
+    win.position.set(side * 1.6, 2.8, 1.56);
+    shop.add(win);
+  }
+
+  shop.position.set(0, 0, z);
+  shop.visible = false;
+  scene.add(shop);
+  return shop;
+}
+
+const pizzaShop = createPizzaShop(-130);
 
 // ── Decorations (trees alongside track) ──
 function createTree(x, z) {
@@ -670,7 +650,15 @@ function startCountdown() {
   timeLeft = 10;
   runSpeed = 0;
   runDistance = 0;
+  tapsPerSecond = 0;
+  recentTaps = [];
   tapCountEl.textContent = '0';
+  character.scale.setScalar(1);
+  character.position.set(0, 0, 0);
+  camera.fov = 60;
+  camera.updateProjectionMatrix();
+  pizzaShop.visible = false;
+  goalPizza.visible = true;
 
   countdownOverlay.style.display = 'flex';
   let count = 3;
@@ -714,16 +702,35 @@ function endGame() {
   resultTaps.textContent = tapCount;
 
   let grade = '';
-  if (tapCount >= 80) { grade = '🍕 피자 도착! 맛있게 먹자!'; resultGrade.style.color = '#FFD700'; }
-  else if (tapCount >= 60) { grade = '🔥 피자가 코앞이야!'; resultGrade.style.color = '#FF6B35'; }
-  else if (tapCount >= 40) { grade = '🐻 피자 냄새가 나기 시작해!'; resultGrade.style.color = '#4CAF50'; }
+  if (tapCount >= 150) { grade = '🍕🐻 피자가게 입성! 맛있게 먹자!'; resultGrade.style.color = '#FFD700'; }
+  else if (tapCount >= 100) { grade = '🏁 골인! 피자가 눈앞에!'; resultGrade.style.color = '#FF6B35'; }
+  else if (tapCount >= 70) { grade = '🔥 피자 냄새가 진하게 나!'; resultGrade.style.color = '#F7C948'; }
+  else if (tapCount >= 40) { grade = '🐻 조금만 더 힘내!'; resultGrade.style.color = '#4CAF50'; }
   else if (tapCount >= 20) { grade = '🍕 아직 멀었어.. 더 빨리!'; resultGrade.style.color = '#2196F3'; }
   else { grade = '😢 피자가 식어버렸어...'; resultGrade.style.color = '#9E9E9E'; }
 
   resultGrade.textContent = grade;
-  resultScreen.style.display = 'flex';
 
-  saveScore(playerName, tapCount).then(() => renderLeaderboard());
+  // 150번 이상: 피자가게 들어가기 연출
+  if (tapCount >= 150) {
+    pizzaShop.visible = true;
+    gameState = 'entering_shop';
+    setTimeout(() => {
+      resultScreen.style.display = 'flex';
+      saveScore(playerName, tapCount).then(() => renderLeaderboard());
+    }, 2500);
+  } else if (tapCount >= 100) {
+    // 100번 이상: 골인 지점 보이기
+    goalPizza.visible = true;
+    gameState = 'goal_reached';
+    setTimeout(() => {
+      resultScreen.style.display = 'flex';
+      saveScore(playerName, tapCount).then(() => renderLeaderboard());
+    }, 1500);
+  } else {
+    resultScreen.style.display = 'flex';
+    saveScore(playerName, tapCount).then(() => renderLeaderboard());
+  }
 }
 
 // ── Tap Handler ──
@@ -736,8 +743,20 @@ function handleTap(e) {
   void tapCountEl.offsetWidth;
   tapCountEl.classList.add('tap-bounce');
 
-  // Speed boost
-  runSpeed = Math.min(runSpeed + 0.3, 8);
+  // Track taps per second for speed feel
+  const now = performance.now();
+  recentTaps.push(now);
+  recentTaps = recentTaps.filter(t => now - t < 1000);
+  tapsPerSecond = recentTaps.length;
+
+  // Speed boost - more taps = faster!
+  const speedBoost = Math.min(0.15 + tapsPerSecond * 0.05, 1.2);
+  runSpeed = Math.min(runSpeed + speedBoost, 15);
+
+  // Show pizza shop when reaching 100+ taps
+  if (tapCount >= 100) {
+    pizzaShop.visible = true;
+  }
 
   // Ripple effect
   const x = e.clientX || (e.touches && e.touches[0]?.clientX) || window.innerWidth / 2;
@@ -804,28 +823,37 @@ function animate() {
       endGame();
     }
 
-    // Run speed decay
-    runSpeed *= 0.98;
+    // Speed decay - faster decay when not tapping
+    const now = performance.now();
+    recentTaps = recentTaps.filter(t => now - t < 1000);
+    tapsPerSecond = recentTaps.length;
+    runSpeed *= tapsPerSecond > 5 ? 0.985 : 0.96;
     runDistance += runSpeed * delta;
 
-    // Animate legs
-    const legSwing = Math.sin(animTime * 12) * 0.5 * Math.min(runSpeed / 3, 1);
-    legs[0].position.z = legSwing * 0.3;
-    legs[1].position.z = -legSwing * 0.3;
-    legs[0].rotation.x = legSwing;
-    legs[1].rotation.x = -legSwing;
+    // Dynamic bear animation based on speed
+    const speedRatio = Math.min(runSpeed / 8, 1);
+    const bounceFreq = 8 + speedRatio * 16; // faster bounce when running fast
+    const bounceAmp = 0.1 + speedRatio * 0.25;
 
-    // Animate arms
-    arms[0].rotation.x = -legSwing * 0.8;
-    arms[1].rotation.x = legSwing * 0.8;
+    // Bear bouncing up and down (running feel)
+    bearSprite.position.y = 1.8 + Math.abs(Math.sin(animTime * bounceFreq)) * bounceAmp;
 
-    // Body bob
-    body.position.y = 1.8 + Math.abs(Math.sin(animTime * 12)) * 0.05 * Math.min(runSpeed / 3, 1);
-    head.position.y = 2.6 + Math.abs(Math.sin(animTime * 12)) * 0.05 * Math.min(runSpeed / 3, 1);
+    // Bear slight tilt left-right (dynamic sway)
+    bearSprite.rotation.z = Math.sin(animTime * bounceFreq * 0.5) * 0.08 * speedRatio;
 
-    // Camera follows distance
+    // Bear scale pulse when fast
+    const scalePulse = 1 + Math.sin(animTime * bounceFreq) * 0.03 * speedRatio;
+    bearSprite.scale.set(scalePulse, scalePulse, 1);
+
+    // Speed lines effect (camera FOV)
+    camera.fov = 60 + speedRatio * 15;
+    camera.updateProjectionMatrix();
+
+    // Camera follows with dynamic distance
     character.position.z = -runDistance * 0.5;
-    camera.position.z = character.position.z + 8;
+    const camDist = 8 - speedRatio * 2; // closer when fast
+    camera.position.z = character.position.z + camDist;
+    camera.position.y = 4 - speedRatio * 0.5;
     camera.lookAt(character.position.x, 1.5, character.position.z);
 
     // Move trees that went behind camera back to front
@@ -845,17 +873,37 @@ function animate() {
   } else if (gameState === 'idle' || gameState === 'countdown') {
     // Idle animation - gentle bobbing
     character.position.y = Math.sin(animTime * 2) * 0.05;
-    legs[0].rotation.x = 0;
-    legs[1].rotation.x = 0;
-    arms[0].rotation.x = 0;
-    arms[1].rotation.x = 0;
-  } else if (gameState === 'ended') {
+    bearSprite.position.y = 1.8 + Math.sin(animTime * 2) * 0.05;
+    bearSprite.rotation.z = 0;
+
+  } else if (gameState === 'ended' || gameState === 'goal_reached') {
     // Slow down
     runSpeed *= 0.95;
     runDistance += runSpeed * delta;
     character.position.z = -runDistance * 0.5;
     camera.position.z = character.position.z + 8;
     camera.lookAt(character.position.x, 1.5, character.position.z);
+    bearSprite.position.y = 1.8;
+
+  } else if (gameState === 'entering_shop') {
+    // Walk toward pizza shop and shrink (entering)
+    runSpeed = Math.max(runSpeed * 0.97, 2);
+    runDistance += runSpeed * delta;
+    character.position.z = -runDistance * 0.5;
+
+    // Move toward shop door
+    const shopZ = pizzaShop.position.z;
+    const distToShop = Math.abs(character.position.z - shopZ);
+    if (distToShop < 15) {
+      const enterProgress = 1 - (distToShop / 15);
+      character.scale.setScalar(Math.max(1 - enterProgress * 0.8, 0.2));
+      camera.position.z = character.position.z + 8 + enterProgress * 3;
+      camera.position.y = 4 + enterProgress * 2;
+    } else {
+      camera.position.z = character.position.z + 8;
+    }
+    camera.lookAt(character.position.x, 2, character.position.z - 5);
+    bearSprite.position.y = 1.8 + Math.abs(Math.sin(animTime * 12)) * 0.15;
   }
 
   // Rotate pizza markers
