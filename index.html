@@ -389,43 +389,72 @@ for (let side = -1; side <= 1; side += 2) {
   scene.add(grass);
 }
 
-// ── Character (bear image with background removed) ──
+// ── Character (bear image split into upper/lower body for running) ──
 const character = new THREE.Group();
 
-// Load bear image and remove background via canvas
 const bearImg = new Image();
 bearImg.crossOrigin = 'anonymous';
 bearImg.src = '곰돌이 뒷모습.png';
 
-let bearSprite;
-const bearGeo = new THREE.PlaneGeometry(2.2, 2.8);
-const bearMat = new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, alphaTest: 0.3 });
-bearSprite = new THREE.Mesh(bearGeo, bearMat);
-bearSprite.position.y = 2.0;
-character.add(bearSprite);
+// Upper body (head + torso) - top 55% of image
+const upperGeo = new THREE.PlaneGeometry(2.4, 1.8);
+const upperMat = new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, alphaTest: 0.2 });
+const upperBody = new THREE.Mesh(upperGeo, upperMat);
+upperBody.position.y = 2.6;
+character.add(upperBody);
 
-// Shadow blob under bear
-const shadowGeo = new THREE.CircleGeometry(0.6, 16);
-const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 });
+// Left leg - bottom-left 30% of image
+const leftLegGeo = new THREE.PlaneGeometry(1.2, 1.4);
+const leftLegMat = new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, alphaTest: 0.2 });
+const leftLeg = new THREE.Mesh(leftLegGeo, leftLegMat);
+leftLeg.position.set(-0.35, 1.1, 0);
+character.add(leftLeg);
+
+// Right leg - bottom-right 30% of image
+const rightLegGeo = new THREE.PlaneGeometry(1.2, 1.4);
+const rightLegMat = new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, alphaTest: 0.2 });
+const rightLeg = new THREE.Mesh(rightLegGeo, rightLegMat);
+rightLeg.position.set(0.35, 1.1, 0);
+character.add(rightLeg);
+
+// Shadow
+const shadowGeo = new THREE.CircleGeometry(0.8, 16);
+const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 });
 const bearShadow = new THREE.Mesh(shadowGeo, shadowMat);
 bearShadow.rotation.x = -Math.PI / 2;
 bearShadow.position.y = 0.02;
 character.add(bearShadow);
 
-// Dust particles for running effect
+// Dust particles
 const dustParticles = [];
 function spawnDust() {
-  const dustGeo = new THREE.SphereGeometry(0.08, 4, 4);
-  const dustMat = new THREE.MeshBasicMaterial({ color: 0xD2B48C, transparent: true, opacity: 0.6 });
+  const dustGeo = new THREE.SphereGeometry(0.1, 4, 4);
+  const dustMat = new THREE.MeshBasicMaterial({ color: 0xD2B48C, transparent: true, opacity: 0.7 });
   const dust = new THREE.Mesh(dustGeo, dustMat);
   dust.position.set(
-    character.position.x + (Math.random() - 0.5) * 0.5,
-    0.1 + Math.random() * 0.3,
-    character.position.z + 0.5 + Math.random() * 0.5
+    character.position.x + (Math.random() - 0.5) * 0.6,
+    0.05 + Math.random() * 0.2,
+    character.position.z + 0.8 + Math.random() * 0.5
   );
-  dust.userData = { life: 0.5, vel: new THREE.Vector3((Math.random()-0.5)*0.5, Math.random()*2, Math.random()*1) };
+  dust.userData = { life: 0.6, vel: new THREE.Vector3((Math.random()-0.5)*0.8, Math.random()*1.5, Math.random()*1.5) };
   scene.add(dust);
   dustParticles.push(dust);
+}
+
+// Speed lines (streaks behind bear at high speed)
+const speedLines = [];
+function createSpeedLine() {
+  const geo = new THREE.PlaneGeometry(0.03, 0.8 + Math.random() * 0.5);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.4 });
+  const line = new THREE.Mesh(geo, mat);
+  line.position.set(
+    character.position.x + (Math.random() - 0.5) * 2.5,
+    0.5 + Math.random() * 3,
+    character.position.z + 1 + Math.random() * 2
+  );
+  line.userData = { life: 0.3 };
+  scene.add(line);
+  speedLines.push(line);
 }
 
 bearImg.onload = () => {
@@ -435,59 +464,111 @@ bearImg.onload = () => {
   c.height = bearImg.height;
   ctx.drawImage(bearImg, 0, 0);
 
-  // Remove green/nature background - make transparent
+  // Remove background
   const imgData = ctx.getImageData(0, 0, c.width, c.height);
   const d = imgData.data;
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i], g = d[i+1], b = d[i+2];
-    // Remove greens (trees, grass, leaves)
-    if (g > 80 && g > r * 0.9 && g > b * 1.1) {
-      d[i+3] = 0;
-    }
-    // Remove bright sky/white areas at edges
-    if (r > 180 && g > 180 && b > 160 && (r+g+b) > 520) {
-      d[i+3] = 0;
-    }
+    // Remove greens
+    if (g > 80 && g > r * 0.85 && g > b * 1.05) d[i+3] = 0;
+    // Remove bright areas
+    if (r > 170 && g > 170 && b > 150 && (r+g+b) > 500) d[i+3] = 0;
     // Remove yellowish greens
-    if (g > 100 && r > 80 && b < 100 && g > b * 1.5) {
-      d[i+3] = 0;
-    }
+    if (g > 90 && r > 70 && b < 90 && g > b * 1.4) d[i+3] = 0;
+    // Remove dark greens
+    if (g > 50 && g > r * 1.2 && b < g * 0.8 && r < 100) d[i+3] = 0;
   }
 
-  // Edge smoothing pass
+  // Edge smoothing
   const w = c.width, h = c.height;
-  for (let y = 1; y < h-1; y++) {
-    for (let x = 1; x < w-1; x++) {
+  const d2 = new Uint8ClampedArray(d);
+  for (let y = 2; y < h-2; y++) {
+    for (let x = 2; x < w-2; x++) {
       const idx = (y * w + x) * 4;
       if (d[idx+3] > 0) {
-        let transparentNeighbors = 0;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
+        let trans = 0;
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
             if (dx === 0 && dy === 0) continue;
             const nIdx = ((y+dy) * w + (x+dx)) * 4;
-            if (d[nIdx+3] === 0) transparentNeighbors++;
+            if (d[nIdx+3] === 0) trans++;
           }
         }
-        if (transparentNeighbors >= 5) d[idx+3] = 0;
-        else if (transparentNeighbors >= 3) d[idx+3] = Math.min(d[idx+3], 180);
+        if (trans >= 16) d2[idx+3] = 0;
+        else if (trans >= 10) d2[idx+3] = Math.min(d[idx+3], 120);
+        else if (trans >= 6) d2[idx+3] = Math.min(d[idx+3], 200);
       }
     }
   }
 
-  ctx.putImageData(imgData, 0, 0);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  bearMat.map = tex;
-  bearMat.needsUpdate = true;
+  // Create upper body texture (top 55%)
+  const upperCanvas = document.createElement('canvas');
+  upperCanvas.width = w; upperCanvas.height = Math.floor(h * 0.55);
+  const uCtx = upperCanvas.getContext('2d');
+  const upperImgData = new ImageData(new Uint8ClampedArray(d2.buffer, 0, w * Math.floor(h * 0.55) * 4), w, Math.floor(h * 0.55));
+  uCtx.putImageData(upperImgData, 0, 0);
+  const upperTex = new THREE.CanvasTexture(upperCanvas);
+  upperTex.colorSpace = THREE.SRGBColorSpace;
+  upperMat.map = upperTex;
+  upperMat.needsUpdate = true;
+
+  // Create left leg texture (bottom-left)
+  const splitY = Math.floor(h * 0.5);
+  const legH = h - splitY;
+  const halfW = Math.floor(w * 0.55);
+
+  const llCanvas = document.createElement('canvas');
+  llCanvas.width = halfW; llCanvas.height = legH;
+  const llCtx = llCanvas.getContext('2d');
+  const llData = llCtx.createImageData(halfW, legH);
+  for (let y = 0; y < legH; y++) {
+    for (let x = 0; x < halfW; x++) {
+      const srcIdx = ((y + splitY) * w + x) * 4;
+      const dstIdx = (y * halfW + x) * 4;
+      llData.data[dstIdx] = d2[srcIdx];
+      llData.data[dstIdx+1] = d2[srcIdx+1];
+      llData.data[dstIdx+2] = d2[srcIdx+2];
+      llData.data[dstIdx+3] = d2[srcIdx+3];
+    }
+  }
+  llCtx.putImageData(llData, 0, 0);
+  const llTex = new THREE.CanvasTexture(llCanvas);
+  llTex.colorSpace = THREE.SRGBColorSpace;
+  leftLegMat.map = llTex;
+  leftLegMat.needsUpdate = true;
+
+  // Create right leg texture (bottom-right)
+  const rlCanvas = document.createElement('canvas');
+  const rlW = w - halfW + Math.floor(w * 0.1);
+  rlCanvas.width = rlW; rlCanvas.height = legH;
+  const rlCtx = rlCanvas.getContext('2d');
+  const rlData = rlCtx.createImageData(rlW, legH);
+  const rlStart = halfW - Math.floor(w * 0.1);
+  for (let y = 0; y < legH; y++) {
+    for (let x = 0; x < rlW; x++) {
+      const srcIdx = ((y + splitY) * w + (x + rlStart)) * 4;
+      const dstIdx = (y * rlW + x) * 4;
+      rlData.data[dstIdx] = d2[srcIdx];
+      rlData.data[dstIdx+1] = d2[srcIdx+1];
+      rlData.data[dstIdx+2] = d2[srcIdx+2];
+      rlData.data[dstIdx+3] = d2[srcIdx+3];
+    }
+  }
+  rlCtx.putImageData(rlData, 0, 0);
+  const rlTex = new THREE.CanvasTexture(rlCanvas);
+  rlTex.colorSpace = THREE.SRGBColorSpace;
+  rightLegMat.map = rlTex;
+  rightLegMat.needsUpdate = true;
 };
 
 scene.add(character);
 
-// Dummy refs
-const legs = [bearSprite, bearSprite];
-const arms = [bearSprite, bearSprite];
-const body = bearSprite;
-const head = bearSprite;
+// Refs for animation
+const bearSprite = upperBody;
+const legs = [leftLeg, rightLeg];
+const arms = [upperBody, upperBody];
+const body = upperBody;
+const head = upperBody;
 
 // ── Speed tracking for dynamic animation ──
 let tapsPerSecond = 0;
@@ -738,10 +819,15 @@ function startCountdown() {
   tapCountEl.textContent = '0';
   character.scale.setScalar(1);
   character.position.set(0, 0, 0);
+  character.rotation.z = 0;
   camera.fov = 60;
+  camera.position.x = 0;
   camera.updateProjectionMatrix();
   pizzaShop.visible = false;
   goalPizza.visible = true;
+  // Clean leftover particles
+  dustParticles.forEach(d => scene.remove(d)); dustParticles.length = 0;
+  speedLines.forEach(s => scene.remove(s)); speedLines.length = 0;
 
   countdownOverlay.style.display = 'flex';
   let count = 3;
@@ -916,61 +1002,85 @@ function animate() {
     // Dynamic bear animation based on speed
     const speedRatio = Math.min(runSpeed / 10, 1);
     const bounceFreq = 10 + speedRatio * 18;
-    const bounceAmp = 0.05 + speedRatio * 0.3;
+    const bounceAmp = 0.08 + speedRatio * 0.25;
 
-    // Running cycle phase
+    // Running cycle
     const runCycle = Math.sin(animTime * bounceFreq);
     const runCycleAbs = Math.abs(runCycle);
+    const stepPhase = animTime * bounceFreq;
 
-    // Bear bouncing - sharp up, smooth down (like real running)
-    bearSprite.position.y = 2.0 + runCycleAbs * bounceAmp;
+    // === UPPER BODY ===
+    // Bounce up/down
+    upperBody.position.y = 2.6 + runCycleAbs * bounceAmp;
+    // Forward lean (more when faster)
+    upperBody.rotation.x = speedRatio * 0.15;
+    // Shoulder sway (counter to legs)
+    upperBody.rotation.z = Math.sin(stepPhase) * 0.07 * speedRatio;
+    // Slight bob scale
+    const ubSquash = 1 - runCycleAbs * 0.03 * speedRatio;
+    upperBody.scale.set(1 + runCycleAbs * 0.02 * speedRatio, ubSquash, 1);
 
-    // Forward/backward lean based on speed
-    bearSprite.rotation.x = speedRatio * 0.12;
+    // === LEGS - alternating swing ===
+    const legSwingAngle = speedRatio * 0.4;
+    const legBounce = runCycleAbs * bounceAmp * 0.6;
 
-    // Left-right sway (alternating with each step)
-    bearSprite.rotation.z = runCycle * 0.06 * speedRatio;
+    // Left leg: swings forward when right swings back
+    leftLeg.position.y = 1.1 + legBounce;
+    leftLeg.position.z = Math.sin(stepPhase) * 0.3 * speedRatio;
+    leftLeg.rotation.z = Math.sin(stepPhase) * legSwingAngle;
 
-    // Slight left-right position shift (hip movement)
-    bearSprite.position.x = Math.sin(animTime * bounceFreq * 0.5) * 0.04 * speedRatio;
+    // Right leg: opposite phase
+    rightLeg.position.y = 1.1 + legBounce;
+    rightLeg.position.z = Math.sin(stepPhase + Math.PI) * 0.3 * speedRatio;
+    rightLeg.rotation.z = Math.sin(stepPhase + Math.PI) * legSwingAngle;
 
-    // Scale: slightly squash on landing, stretch on jump
-    const squash = 1 - runCycleAbs * 0.04 * speedRatio;
-    const stretch = 1 + runCycleAbs * 0.04 * speedRatio;
-    bearSprite.scale.set(stretch, squash, 1);
+    // Whole character hip sway
+    character.rotation.z = Math.sin(stepPhase * 0.5) * 0.02 * speedRatio;
 
-    // Shadow scales with height
-    bearShadow.scale.setScalar(1 - runCycleAbs * bounceAmp * 0.3);
-    bearShadow.material.opacity = 0.3 - runCycleAbs * bounceAmp * 0.1;
+    // === SHADOW ===
+    const totalBounce = runCycleAbs * bounceAmp;
+    bearShadow.scale.setScalar(0.8 + totalBounce * 0.3);
+    bearShadow.material.opacity = 0.35 - totalBounce * 0.15;
 
-    // Spawn dust when running fast
-    if (speedRatio > 0.3 && Math.random() < speedRatio * 0.3) {
+    // === DUST PARTICLES ===
+    if (speedRatio > 0.2 && Math.random() < speedRatio * 0.4) {
       spawnDust();
     }
-
-    // Update dust particles
     for (let i = dustParticles.length - 1; i >= 0; i--) {
       const dust = dustParticles[i];
       dust.userData.life -= delta;
       dust.position.add(dust.userData.vel.clone().multiplyScalar(delta));
       dust.userData.vel.y -= delta * 3;
       dust.material.opacity = Math.max(0, dust.userData.life * 1.2);
-      dust.scale.setScalar(1 + (0.5 - dust.userData.life));
-      if (dust.userData.life <= 0) {
-        scene.remove(dust);
-        dustParticles.splice(i, 1);
-      }
+      dust.scale.setScalar(1 + (0.6 - dust.userData.life) * 1.5);
+      if (dust.userData.life <= 0) { scene.remove(dust); dustParticles.splice(i, 1); }
     }
 
-    // Speed lines effect (camera FOV)
+    // === SPEED LINES at high speed ===
+    if (speedRatio > 0.6 && Math.random() < (speedRatio - 0.5) * 0.5) {
+      createSpeedLine();
+    }
+    for (let i = speedLines.length - 1; i >= 0; i--) {
+      const sl = speedLines[i];
+      sl.userData.life -= delta;
+      sl.position.z += delta * 8;
+      sl.material.opacity = Math.max(0, sl.userData.life * 1.5);
+      if (sl.userData.life <= 0) { scene.remove(sl); speedLines.splice(i, 1); }
+    }
+
+    // === CAMERA ===
     camera.fov = 60 + speedRatio * 15;
     camera.updateProjectionMatrix();
-
-    // Camera follows with dynamic distance
     character.position.z = -runDistance * 0.5;
     const camDist = 8 - speedRatio * 2;
     camera.position.z = character.position.z + camDist;
     camera.position.y = 4 - speedRatio * 0.5;
+    // Slight camera shake at high speed
+    if (speedRatio > 0.7) {
+      const shake = (speedRatio - 0.7) * 0.08;
+      camera.position.x = Math.sin(animTime * 30) * shake;
+      camera.position.y += Math.cos(animTime * 25) * shake * 0.5;
+    }
     camera.lookAt(character.position.x, 1.5, character.position.z);
 
     // Move trees that went behind camera back to front
@@ -988,62 +1098,84 @@ function animate() {
     });
 
   } else if (gameState === 'idle' || gameState === 'countdown') {
-    // Idle animation - gentle bobbing
-    character.position.y = Math.sin(animTime * 2) * 0.03;
-    bearSprite.position.y = 2.0 + Math.sin(animTime * 2) * 0.05;
-    bearSprite.rotation.z = 0;
-    bearSprite.rotation.x = 0;
-    bearSprite.scale.set(1, 1, 1);
+    // Idle: gentle breathing
+    const idleBob = Math.sin(animTime * 2) * 0.04;
+    upperBody.position.y = 2.6 + idleBob;
+    upperBody.rotation.x = 0;
+    upperBody.rotation.z = 0;
+    upperBody.scale.set(1, 1, 1);
+    leftLeg.position.y = 1.1;
+    leftLeg.position.z = 0;
+    leftLeg.rotation.z = 0;
+    rightLeg.position.y = 1.1;
+    rightLeg.position.z = 0;
+    rightLeg.rotation.z = 0;
+    character.rotation.z = 0;
+    character.position.y = 0;
 
   } else if (gameState === 'ended' || gameState === 'goal_reached') {
-    // Slow down with gentle bounce
-    runSpeed *= 0.95;
+    // Slow jog to stop
+    runSpeed *= 0.94;
     runDistance += runSpeed * delta;
     character.position.z = -runDistance * 0.5;
     camera.position.z = character.position.z + 8;
+    camera.position.x = 0;
     camera.lookAt(character.position.x, 1.5, character.position.z);
-    bearSprite.position.y = 2.0 + Math.abs(Math.sin(animTime * 6)) * 0.05;
-    bearSprite.rotation.x = 0;
-    bearSprite.rotation.z = 0;
-    bearSprite.scale.set(1, 1, 1);
 
-    // Clean dust
+    const sr = Math.min(runSpeed / 10, 1);
+    const slowBounce = Math.abs(Math.sin(animTime * (8 + sr * 10)));
+    upperBody.position.y = 2.6 + slowBounce * 0.08 * sr;
+    upperBody.rotation.x = sr * 0.05;
+    upperBody.rotation.z = 0;
+    leftLeg.rotation.z = Math.sin(animTime * (8 + sr * 10)) * 0.15 * sr;
+    rightLeg.rotation.z = Math.sin(animTime * (8 + sr * 10) + Math.PI) * 0.15 * sr;
+    character.rotation.z = 0;
+
+    // Clean particles
     for (let i = dustParticles.length - 1; i >= 0; i--) {
-      const dust = dustParticles[i];
-      dust.userData.life -= delta;
-      dust.material.opacity = Math.max(0, dust.userData.life);
-      if (dust.userData.life <= 0) { scene.remove(dust); dustParticles.splice(i, 1); }
+      const d = dustParticles[i]; d.userData.life -= delta; d.material.opacity = Math.max(0, d.userData.life);
+      if (d.userData.life <= 0) { scene.remove(d); dustParticles.splice(i, 1); }
+    }
+    for (let i = speedLines.length - 1; i >= 0; i--) {
+      const s = speedLines[i]; s.userData.life -= delta; s.material.opacity = Math.max(0, s.userData.life);
+      if (s.userData.life <= 0) { scene.remove(s); speedLines.splice(i, 1); }
     }
 
   } else if (gameState === 'entering_shop') {
-    // Walk toward pizza shop
-    runSpeed = Math.max(runSpeed * 0.97, 2);
+    // Jog toward pizza shop
+    runSpeed = Math.max(runSpeed * 0.97, 3);
     runDistance += runSpeed * delta;
     character.position.z = -runDistance * 0.5;
 
-    // Bear keeps jogging
-    bearSprite.position.y = 2.0 + Math.abs(Math.sin(animTime * 12)) * 0.15;
-    bearSprite.rotation.z = Math.sin(animTime * 6) * 0.04;
+    // Keep running animation
+    const shopStep = animTime * 14;
+    upperBody.position.y = 2.6 + Math.abs(Math.sin(shopStep)) * 0.15;
+    upperBody.rotation.z = Math.sin(shopStep) * 0.05;
+    leftLeg.rotation.z = Math.sin(shopStep) * 0.3;
+    rightLeg.rotation.z = Math.sin(shopStep + Math.PI) * 0.3;
 
-    // Move toward shop door - shrink as entering
+    // Shrink as entering shop
     const shopZ = pizzaShop.position.z;
     const distToShop = Math.abs(character.position.z - shopZ);
     if (distToShop < 15) {
       const enterProgress = 1 - (distToShop / 15);
-      character.scale.setScalar(Math.max(1 - enterProgress * 0.8, 0.2));
-      camera.position.z = character.position.z + 8 + enterProgress * 3;
-      camera.position.y = 4 + enterProgress * 2;
+      character.scale.setScalar(Math.max(1 - enterProgress * 0.8, 0.15));
+      camera.position.z = character.position.z + 8 + enterProgress * 4;
+      camera.position.y = 4 + enterProgress * 3;
     } else {
       camera.position.z = character.position.z + 8;
     }
+    camera.position.x = 0;
     camera.lookAt(character.position.x, 2, character.position.z - 5);
 
-    // Clean dust
+    // Clean particles
     for (let i = dustParticles.length - 1; i >= 0; i--) {
-      const dust = dustParticles[i];
-      dust.userData.life -= delta;
-      dust.material.opacity = Math.max(0, dust.userData.life);
-      if (dust.userData.life <= 0) { scene.remove(dust); dustParticles.splice(i, 1); }
+      const d = dustParticles[i]; d.userData.life -= delta; d.material.opacity = Math.max(0, d.userData.life);
+      if (d.userData.life <= 0) { scene.remove(d); dustParticles.splice(i, 1); }
+    }
+    for (let i = speedLines.length - 1; i >= 0; i--) {
+      const s = speedLines[i]; s.userData.life -= delta; s.material.opacity = Math.max(0, s.userData.life);
+      if (s.userData.life <= 0) { scene.remove(s); speedLines.splice(i, 1); }
     }
   }
 
