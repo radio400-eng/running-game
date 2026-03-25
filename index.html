@@ -512,6 +512,8 @@ function handleTap(e) {
 
 // Prevent double events on mobile
 window.addEventListener('touchstart', (e) => {
+  // 버튼 터치는 기본 동작 허용
+  if (e.target.closest('.btn')) return;
   e.preventDefault();
   handleTap(e);
 }, { passive: false });
