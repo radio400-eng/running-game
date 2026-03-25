@@ -951,9 +951,11 @@ function animate() {
     bearSprite.rotation.z = runCycle * 0.08 * speedRatio;
     // Forward lean when running fast
     bearSprite.rotation.x = speedRatio * 0.12;
-    // Squash & stretch
-    const sq = 1 - runCycleAbs * 0.05 * speedRatio;
-    const st = 1 + runCycleAbs * 0.04 * speedRatio;
+    // Grow bigger as tap count increases (1.0 → 1.8 at 150 taps)
+    const growScale = 1 + Math.min(tapCount / 150, 1) * 0.8;
+    // Squash & stretch on top of growth
+    const sq = growScale - runCycleAbs * 0.05 * speedRatio;
+    const st = growScale + runCycleAbs * 0.04 * speedRatio;
     bearSprite.scale.set(st, sq, 1);
     // Hip shift
     bearSprite.position.x = runCycle * 0.05 * speedRatio;
