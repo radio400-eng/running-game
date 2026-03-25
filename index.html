@@ -304,6 +304,22 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCLUnG5N2d5mGRij2UYctkdW76LaxolUOA",
+    authDomain: "ten-run.firebaseapp.com",
+    projectId: "ten-run",
+    storageBucket: "ten-run.firebasestorage.app",
+    messagingSenderId: "18004709695",
+    appId: "1:18004709695:web:75cedb6110103c45f7438a",
+    measurementId: "G-1P1TN66JYJ"
+  };
+  firebase.initializeApp(firebaseConfig);
+  window.db = firebase.firestore();
+</script>
+
 <script type="importmap">
 {
   "imports": {
@@ -505,34 +521,44 @@ const resultGrade = document.getElementById('result-grade');
 const nameInput = document.getElementById('name-input');
 const lbList = document.getElementById('lb-list');
 
-// ── Leaderboard ──
-function getLeaderboard() {
+// ── Leaderboard (Firestore) ──
+const db = window.db;
+
+async function saveScore(name, score) {
   try {
-    return JSON.parse(localStorage.getItem('runningLeaderboard') || '[]');
-  } catch { return []; }
+    await db.collection('leaderboard').add({
+      name,
+      score,
+      date: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (e) { console.error('저장 실패:', e); }
 }
 
-function saveScore(name, score) {
-  const lb = getLeaderboard();
-  lb.push({ name, score, date: Date.now() });
-  lb.sort((a, b) => b.score - a.score);
-  localStorage.setItem('runningLeaderboard', JSON.stringify(lb.slice(0, 10)));
-}
-
-function renderLeaderboard() {
-  const lb = getLeaderboard();
+async function renderLeaderboard() {
   const medals = ['🥇', '🥈', '🥉'];
-  if (lb.length === 0) {
-    lbList.innerHTML = '<div class="lb-empty">기록 없음</div>';
-    return;
+  try {
+    const snapshot = await db.collection('leaderboard')
+      .orderBy('score', 'desc')
+      .limit(3)
+      .get();
+    if (snapshot.empty) {
+      lbList.innerHTML = '<div class="lb-empty">기록 없음</div>';
+      return;
+    }
+    lbList.innerHTML = '';
+    snapshot.forEach((doc, i) => {
+      const data = doc.data();
+      const idx = lbList.children.length;
+      lbList.innerHTML += `<div class="lb-entry">
+        <span class="lb-rank">${medals[idx] || ''}</span>
+        <span class="lb-name">${data.name}</span>
+        <span class="lb-score">${data.score}회</span>
+      </div>`;
+    });
+  } catch (e) {
+    console.error('랭킹 로드 실패:', e);
+    lbList.innerHTML = '<div class="lb-empty">로딩 중...</div>';
   }
-  lbList.innerHTML = lb.slice(0, 3).map((entry, i) =>
-    `<div class="lb-entry">
-      <span class="lb-rank">${medals[i]}</span>
-      <span class="lb-name">${entry.name}</span>
-      <span class="lb-score">${entry.score}회</span>
-    </div>`
-  ).join('');
 }
 
 renderLeaderboard();
@@ -615,8 +641,7 @@ function endGame() {
   resultGrade.textContent = grade;
   resultScreen.style.display = 'flex';
 
-  saveScore(playerName, tapCount);
-  renderLeaderboard();
+  saveScore(playerName, tapCount).then(() => renderLeaderboard());
 }
 
 // ── Tap Handler ──
